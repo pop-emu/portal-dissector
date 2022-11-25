@@ -22,7 +22,7 @@ local command_lookup = {
 	[0x51] = "Query",
 	[0x52] = "Reset",
 	[0x53] = "Status",
-	[0x56] = "Version", --unsure of correct name or data
+	[0x56] = "Version?", --unsure of correct name or data
 	[0x57] = "Write"
 }
 
@@ -100,6 +100,10 @@ local function parse_reset(pinfo, buffer, subtree)
 	end
 end
 
+local function parse_version(pinfo, buffer, subtree)
+	subtree:add_le(id, buffer(1, 3), buffer(1, 3):bytes():tohex())
+end
+
 local command_parsers = {
 	[0x41] = parse_activate,
 	[0x43] = parse_color,
@@ -109,7 +113,7 @@ local command_parsers = {
 	--[0x51] = "Query",
 	[0x52] = parse_reset,
 	--[0x53] = "Status",
-	--[0x56] = "Version", --unsure of correct name or data
+	[0x56] = parse_version, --unsure of correct name or data
 	--[0x57] = "Write"
 }
 
