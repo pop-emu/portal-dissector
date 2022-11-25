@@ -10,6 +10,8 @@ local color_side = ProtoField.uint8("portal.color.side", "Side")
 local light_position = ProtoField.uint8("portal.light.position", "Position")
 local activate = ProtoField.bool("portal.activate", "Activate")
 local music_activate = ProtoField.bool("portal.music.activate", "Activate")
+local status_activated = ProtoField.bool("portal.status.activated", "Activated")
+local status_counter = ProtoField.uint8("portal.status.counter", "Counter")
 local id = ProtoField.string("portal.id", "ID")
 local unknown = ProtoField.string("portal.unknown", "Unknown")
 
@@ -38,7 +40,7 @@ local light_position_lookup = {
 	[0x02] = "Left"
 }
 
-portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id }
+portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter }
 
 local function is_response(pinfo)
 	return tostring(pinfo.src) ~= "host"
@@ -100,6 +102,13 @@ local function parse_reset(pinfo, buffer, subtree)
 	end
 end
 
+local function parse_status(pinfo, buffer, subtree)
+	if is_response(pinfo) then
+		subtree:add_le(status_counter, buffer(5, 1))
+		subtree:add_le(status_activated, buffer(6, 1))
+	end
+end
+
 local function parse_version(pinfo, buffer, subtree)
 	subtree:add_le(id, buffer(1, 3), buffer(1, 3):bytes():tohex())
 end
@@ -112,7 +121,7 @@ local command_parsers = {
 	[0x4D] = parse_music,
 	--[0x51] = "Query",
 	[0x52] = parse_reset,
-	--[0x53] = "Status",
+	[0x53] = parse_status,
 	[0x56] = parse_version, --unsure of correct name or data
 	--[0x57] = "Write"
 }
