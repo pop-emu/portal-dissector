@@ -12,6 +12,9 @@ local activate = ProtoField.bool("portal.activate", "Activate")
 local music_activate = ProtoField.bool("portal.music.activate", "Activate")
 local status_activated = ProtoField.bool("portal.status.activated", "Activated")
 local status_counter = ProtoField.uint8("portal.status.counter", "Counter")
+local status_figure_indexes = ProtoField.uint32("portal.status.indexes.present", "Figure indexes")
+local status_figure_added_indexes = ProtoField.uint32("portal.status.indexes.added", "Added figure indexes")
+local status_figure_removed_indexes = ProtoField.uint32("portal.status.indexes.removed", "Removed figure indexes")
 local id = ProtoField.string("portal.id", "ID")
 local unknown = ProtoField.string("portal.unknown", "Unknown")
 
@@ -40,7 +43,7 @@ local light_position_lookup = {
 	[0x02] = "Left"
 }
 
-portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter }
+portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter, status_figure_indexes, status_figure_added_indexes, status_figure_removed_indexes }
 
 local function is_response(pinfo)
 	return tostring(pinfo.src) ~= "host"
@@ -53,7 +56,11 @@ local function parse_command_character(pinfo, buffer, subtree)
 
 	subtree:add_le(command, buffer(0, 1)):append_text(string.format(" (%s)", command_text))
 
-	pinfo.cols.info = string.upper(command_text)
+	local direction = string.upper("request")
+
+	if is_response(pinfo) then direction = string.upper("response") end
+
+	pinfo.cols.info = string.format("%s %s", string.upper(command_text), direction)
 
 	return command_char
 
@@ -104,6 +111,46 @@ end
 
 local function parse_status(pinfo, buffer, subtree)
 	if is_response(pinfo) then
+		local indexes = {}
+		local added_indexes = {}
+		local removed_indexes = {}
+
+		for j=0, 3, 1 do
+			for i=0, 3, 1 do
+				if bit.band(buffer(1 + j, 1):le_int(), bit.lshift(1, i * 2)) > 0 then
+					table.insert(indexes, j * 4 + i)
+				end
+			end
+		end
+
+		--doesn't work. Am I checking if it exists wrong?
+		--for j=0, 3, 1 do
+		--	for i=0, 3, 1 do
+		--		if bit.band(buffer(1 + j, 1):le_int(), bit.lshift(2, i * 2)) > 0 then
+		--			if indexes[j * 4 + i] ~= nil then
+		--				table.insert(added_indexes, j * 4 + i)
+		--			else
+		--				table.insert(removed_indexes, j * 4 + i)
+		--			end
+		--		end
+		--	end
+		--end
+
+		local index_text = " (none)"
+
+		if #indexes ~= 0 then
+			index_text = string.format(" (%s)", table.concat(indexes, ", "))
+		end
+
+		subtree:add_le(status_figure_indexes, buffer(1, 4)):append_text(index_text)
+		for _ in pairs(added_indexes) do
+			subtree:add_le(status_figure_added_indexes, buffer(1, 4)):append_text(string.format(" (%s)", table.concat(added_indexes, ", ")))
+			break
+		end
+		for _ in pairs(removed_indexes) do
+			subtree:add_le(status_figure_removed_indexes, buffer(1, 4)):append_text(string.format(" (%s)", table.concat(removed_indexes, ", ")))
+			break
+		end
 		subtree:add_le(status_counter, buffer(5, 1))
 		subtree:add_le(status_activated, buffer(6, 1))
 	end
