@@ -49,6 +49,18 @@ local function is_response(pinfo)
 	return tostring(pinfo.src) ~= "host"
 end
 
+local function table_contains_value(containing_table, check_value)
+
+	for _, value in pairs(containing_table) do
+		if value == check_value then
+			return true
+		end
+	end
+
+	return false
+
+end
+
 local function parse_command_character(pinfo, buffer, subtree)
 
 	local command_char = buffer(0, 1):le_int()
@@ -123,18 +135,17 @@ local function parse_status(pinfo, buffer, subtree)
 			end
 		end
 
-		--doesn't work. Am I checking if it exists wrong?
-		--for j=0, 3, 1 do
-		--	for i=0, 3, 1 do
-		--		if bit.band(buffer(1 + j, 1):le_int(), bit.lshift(2, i * 2)) > 0 then
-		--			if indexes[j * 4 + i] ~= nil then
-		--				table.insert(added_indexes, j * 4 + i)
-		--			else
-		--				table.insert(removed_indexes, j * 4 + i)
-		--			end
-		--		end
-		--	end
-		--end
+		for j=0, 3, 1 do
+			for i=0, 3, 1 do
+				if bit.band(buffer(1 + j, 1):le_int(), bit.lshift(2, i * 2)) > 0 then
+					if table_contains_value(indexes, j * 4 + i) then
+						table.insert(added_indexes, j * 4 + i)
+					else
+						table.insert(removed_indexes, j * 4 + i)
+					end
+				end
+			end
+		end
 
 		local index_text = " (none)"
 
@@ -196,7 +207,13 @@ function portal_protocol.dissector(buffer, pinfo, tree)
 
 	pinfo.cols.protocol = portal_protocol.name
 
-	local subtree = tree:add(portal_protocol, buffer(), "Skylanders portal data")
+	local offset = 0
+
+	if is_response(pinfo) ~= true then
+		offset = 7
+	end
+
+	local subtree = tree:add(portal_protocol, buffer(offset), "Skylanders portal data")
 
 	if is_response(pinfo) ~= true then
 		-- TODO: check if packet is interrupt. Not length
@@ -204,10 +221,9 @@ function portal_protocol.dissector(buffer, pinfo, tree)
 			parse_music(buffer, pinfo, subtree)
 			return
 		end
-		parse_command(pinfo, buffer(7), subtree)
-	else
-		parse_command(pinfo, buffer, subtree)
 	end
+
+	parse_command(pinfo, buffer(offset), subtree)
 
 	
 end
