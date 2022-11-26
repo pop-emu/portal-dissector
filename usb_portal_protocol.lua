@@ -20,6 +20,9 @@ local unknown = ProtoField.string("portal.unknown", "Unknown")
 local query_figure_index = ProtoField.uint8("portal.query.figure_index", "Figure index")
 local query_block_index = ProtoField.uint8("portal.query.block_index", "Block index")
 local query_data = ProtoField.string("portal.query.data", "Data")
+local write_figure_index = ProtoField.uint8("portal.query.figure_index", "Figure index")
+local write_block_index = ProtoField.uint8("portal.query.block_index", "Block index")
+local write_data = ProtoField.string("portal.query.data", "Data")
 
 local command_lookup = {
 	[0x41] = "Activate",
@@ -46,7 +49,7 @@ local light_position_lookup = {
 	[0x02] = "Left"
 }
 
-portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter, status_figure_indexes, status_figure_added_indexes, status_figure_removed_indexes, query_figure_index, query_block_index, query_data }
+portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter, status_figure_indexes, status_figure_added_indexes, status_figure_removed_indexes, query_figure_index, query_block_index, query_data, write_figure_index, write_block_index, write_data }
 
 local function is_response(pinfo)
 	return tostring(pinfo.src) ~= "host"
@@ -183,6 +186,15 @@ local function parse_version(pinfo, buffer, subtree)
 	subtree:add_le(id, buffer(1, 3), buffer(1, 3):bytes():tohex())
 end
 
+local function parse_write(pinfo, buffer, subtree)
+	subtree:add_le(write_figure_index, buffer(1, 1))
+	subtree:add_le(write_block_index, buffer(2, 1))
+
+	if is_response(pinfo) ~= true then
+		subtree:add_le(write_data, buffer(3), buffer(3):bytes():tohex())
+	end
+end
+
 local command_parsers = {
 	[0x41] = parse_activate,
 	[0x43] = parse_color,
@@ -193,7 +205,7 @@ local command_parsers = {
 	[0x52] = parse_reset,
 	[0x53] = parse_status,
 	[0x56] = parse_version, --unsure of correct name or data
-	--[0x57] = "Write"
+	[0x57] = parse_write
 }
 
 local function parse_command(pinfo, buffer, subtree)
