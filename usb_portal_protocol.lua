@@ -17,6 +17,9 @@ local status_figure_added_indexes = ProtoField.uint32("portal.status.indexes.add
 local status_figure_removed_indexes = ProtoField.uint32("portal.status.indexes.removed", "Removed figure indexes")
 local id = ProtoField.string("portal.id", "ID")
 local unknown = ProtoField.string("portal.unknown", "Unknown")
+local query_figure_index = ProtoField.uint8("portal.query.figure_index", "Figure index")
+local query_block_index = ProtoField.uint8("portal.query.block_index", "Block index")
+local query_data = ProtoField.string("portal.query.data", "Data")
 
 local command_lookup = {
 	[0x41] = "Activate",
@@ -43,7 +46,7 @@ local light_position_lookup = {
 	[0x02] = "Left"
 }
 
-portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter, status_figure_indexes, status_figure_added_indexes, status_figure_removed_indexes }
+portal_protocol.fields = { command, music_data, color_red, color_green, color_blue, activate, unknown, color_side, light_position, music_activate, id, status_activated, status_counter, status_figure_indexes, status_figure_added_indexes, status_figure_removed_indexes, query_figure_index, query_block_index, query_data }
 
 local function is_response(pinfo)
 	return tostring(pinfo.src) ~= "host"
@@ -115,6 +118,15 @@ local function parse_music(pinfo, buffer, subtree)
 	end
 end
 
+local function parse_query(pinfo, buffer, subtree)
+	subtree:add_le(query_figure_index, buffer(1, 1), buffer(1, 1):le_int() % 16)
+	subtree:add_le(query_block_index, buffer(2, 1))
+
+	if is_response(pinfo) then
+		subtree:add_le(query_data, buffer(3), buffer(3):bytes():tohex())
+	end
+end
+
 local function parse_reset(pinfo, buffer, subtree)
 	if is_response(pinfo) then
 		subtree:add_le(id, buffer(1, 2), buffer(1, 2):bytes():tohex())
@@ -177,7 +189,7 @@ local command_parsers = {
 	[0x4A] = parse_color_sided,
 	[0x4C] = parse_color_light,
 	[0x4D] = parse_music,
-	--[0x51] = "Query",
+	[0x51] = parse_query,
 	[0x52] = parse_reset,
 	[0x53] = parse_status,
 	[0x56] = parse_version, --unsure of correct name or data
